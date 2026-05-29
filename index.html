@@ -129,6 +129,16 @@
         </section>
 
         <section class="card">
+          <h2>Global Leaderboard</h2>
+          <div id="globalLeaderboardTabs" class="segmented" role="tablist" aria-label="Global leaderboard levels">
+            <button type="button" data-leaderboard-difficulty="easy" role="tab">Easy</button>
+            <button type="button" data-leaderboard-difficulty="medium" role="tab" class="selected">Medium</button>
+            <button type="button" data-leaderboard-difficulty="hard" role="tab">Hard</button>
+          </div>
+          <ol id="globalLeaderboardList" class="leaderboard global-leaderboard"></ol>
+        </section>
+
+        <section class="card">
           <h2>Local Leaderboard</h2>
           <ol id="leaderboardList" class="leaderboard"></ol>
         </section>

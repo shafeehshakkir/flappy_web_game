@@ -1,5 +1,6 @@
 const express = require("express");
 const http = require("http");
+const fs = require("fs");
 const path = require("path");
 const { WebSocketServer } = require("ws");
 const crypto = require("crypto");
@@ -16,9 +17,203 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+app.use(express.json({ limit: "64kb" }));
 app.use(express.static(path.join(__dirname)));
 
 const rooms = new Map();
+const GLOBAL_LEADERBOARD_DIR = path.join(__dirname, "data");
+const GLOBAL_LEADERBOARD_PATH = path.join(GLOBAL_LEADERBOARD_DIR, "global_leaderboard.json");
+const GLOBAL_LEADERBOARD_MAX_PLAYERS = 5000;
+
+let globalLeaderboard = loadGlobalLeaderboard();
+let globalLeaderboardDirty = false;
+let globalLeaderboardSaveTimer = null;
+
+function emptyGlobalLeaderboard() {
+  return {
+    version: 1,
+    updatedAt: Date.now(),
+    difficulties: {
+      easy: {},
+      medium: {},
+      hard: {}
+    }
+  };
+}
+
+function ensureLeaderboardDir() {
+  try {
+    fs.mkdirSync(GLOBAL_LEADERBOARD_DIR, { recursive: true });
+  } catch {
+    // ignore
+  }
+}
+
+function normalizeGlobalLeaderboard(data) {
+  const base = emptyGlobalLeaderboard();
+  if (!data || typeof data !== "object") return base;
+
+  const source = data.difficulties && typeof data.difficulties === "object" ? data.difficulties : {};
+  for (const difficulty of DIFFICULTY_LEVELS) {
+    const bucket = source[difficulty];
+    if (bucket && typeof bucket === "object") {
+      base.difficulties[difficulty] = bucket;
+    }
+  }
+
+  const updatedAt = Number(data.updatedAt);
+  if (Number.isFinite(updatedAt) && updatedAt > 0) base.updatedAt = updatedAt;
+  return base;
+}
+
+function loadGlobalLeaderboard() {
+  ensureLeaderboardDir();
+  try {
+    const raw = fs.readFileSync(GLOBAL_LEADERBOARD_PATH, "utf8");
+    return normalizeGlobalLeaderboard(JSON.parse(raw));
+  } catch {
+    return emptyGlobalLeaderboard();
+  }
+}
+
+function scheduleSaveGlobalLeaderboard() {
+  if (!globalLeaderboardDirty) return;
+  if (globalLeaderboardSaveTimer) return;
+  globalLeaderboardSaveTimer = setTimeout(() => {
+    globalLeaderboardSaveTimer = null;
+    saveGlobalLeaderboard();
+  }, 650);
+}
+
+function saveGlobalLeaderboard() {
+  if (!globalLeaderboardDirty) return;
+  ensureLeaderboardDir();
+  globalLeaderboard.updatedAt = Date.now();
+
+  const tmpPath = `${GLOBAL_LEADERBOARD_PATH}.tmp`;
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(globalLeaderboard, null, 2), "utf8");
+    fs.renameSync(tmpPath, GLOBAL_LEADERBOARD_PATH);
+    globalLeaderboardDirty = false;
+  } catch (error) {
+    try {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    } catch {
+      // ignore
+    }
+    console.warn("Could not persist global leaderboard:", error && error.message ? error.message : error);
+  }
+}
+
+function maybeTrimGlobalLeaderboard(difficulty) {
+  const bucket = globalLeaderboard.difficulties[difficulty];
+  const keys = bucket ? Object.keys(bucket) : [];
+  if (keys.length <= GLOBAL_LEADERBOARD_MAX_PLAYERS) return;
+
+  keys.sort((a, b) => {
+    const aa = bucket[a] || {};
+    const bb = bucket[b] || {};
+    const scoreDiff = (Number(bb.score) || 0) - (Number(aa.score) || 0);
+    if (scoreDiff) return scoreDiff;
+    return (Number(bb.updatedAt) || 0) - (Number(aa.updatedAt) || 0);
+  });
+
+  const keep = new Set(keys.slice(0, GLOBAL_LEADERBOARD_MAX_PLAYERS));
+  keys.slice(GLOBAL_LEADERBOARD_MAX_PLAYERS).forEach(key => {
+    if (!keep.has(key)) delete bucket[key];
+  });
+}
+
+function tierForScore(score, maxScore) {
+  const safeScore = Math.max(0, Number(score) || 0);
+  const safeMax = Math.max(0, Number(maxScore) || 0);
+  const ratio = safeMax > 0 ? safeScore / safeMax : 0;
+
+  if (ratio >= 0.85) return { id: "diamond", label: "Diamond" };
+  if (ratio >= 0.65) return { id: "platinum", label: "Platinum" };
+  if (ratio >= 0.45) return { id: "gold", label: "Gold" };
+  if (ratio >= 0.25) return { id: "silver", label: "Silver" };
+  return { id: "bronze", label: "Bronze" };
+}
+
+function upsertGlobalHighScore({ difficulty, name, avatar, score }) {
+  const normalizedDifficulty = normalizeDifficulty(difficulty);
+  const safePlayerName = safeName(name);
+  const safeScore = Math.max(0, Math.floor(Number(score) || 0));
+  if (!safeScore) return { updated: false, difficulty: normalizedDifficulty };
+
+  const key = scoreKeyForName(safePlayerName);
+  const bucket = globalLeaderboard.difficulties[normalizedDifficulty];
+  const existing = bucket[key];
+
+  if (!existing || safeScore > (Number(existing.score) || 0)) {
+    bucket[key] = {
+      name: safePlayerName,
+      avatar: safeAvatar(avatar),
+      score: safeScore,
+      updatedAt: Date.now()
+    };
+    globalLeaderboardDirty = true;
+    maybeTrimGlobalLeaderboard(normalizedDifficulty);
+    scheduleSaveGlobalLeaderboard();
+    return { updated: true, difficulty: normalizedDifficulty };
+  }
+
+  return { updated: false, difficulty: normalizedDifficulty };
+}
+
+function getGlobalLeaderboardEntries(difficulty, limit) {
+  const normalizedDifficulty = normalizeDifficulty(difficulty);
+  const safeLimit = Math.max(3, Math.min(50, Math.floor(Number(limit) || 15)));
+  const bucket = globalLeaderboard.difficulties[normalizedDifficulty] || {};
+  const entries = Object.values(bucket)
+    .filter(entry => entry && typeof entry === "object")
+    .map(entry => ({
+      name: safeName(entry.name),
+      avatar: safeAvatar(entry.avatar),
+      score: Math.max(0, Math.floor(Number(entry.score) || 0)),
+      updatedAt: Number(entry.updatedAt) || 0
+    }))
+    .sort((a, b) => b.score - a.score || b.updatedAt - a.updatedAt || a.name.localeCompare(b.name))
+    .slice(0, safeLimit);
+
+  const maxScore = entries.length ? entries[0].score : 0;
+  return entries.map((entry, index) => ({
+    rank: index + 1,
+    ...entry,
+    tier: tierForScore(entry.score, maxScore)
+  }));
+}
+
+app.get("/api/leaderboard", (req, res) => {
+  const difficulty = normalizeDifficulty(req.query.difficulty);
+  const limit = req.query.limit;
+  res.set("Cache-Control", "no-store");
+  res.json({
+    difficulty,
+    updatedAt: globalLeaderboard.updatedAt,
+    entries: getGlobalLeaderboardEntries(difficulty, limit)
+  });
+});
+
+app.post("/api/score", (req, res) => {
+  const body = req.body || {};
+  const score = Math.max(0, Math.floor(Number(body.score) || 0));
+  if (!score) {
+    res.status(400).json({ ok: false, message: "Invalid score." });
+    return;
+  }
+
+  const result = upsertGlobalHighScore({
+    difficulty: body.difficulty,
+    name: body.name,
+    avatar: body.avatar,
+    score
+  });
+
+  res.set("Cache-Control", "no-store");
+  res.json({ ok: true, ...result });
+});
 
 function makeRoomCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -261,6 +456,16 @@ function endRoomMatch(roomCode) {
     avatar: winner.avatar,
     score: winner.bestScore
   } : null;
+
+  for (const record of room.scores.values()) {
+    const best = Math.max(Number(record.bestScore) || 0, Number(record.score) || 0);
+    upsertGlobalHighScore({
+      difficulty: room.difficulty,
+      name: record.name,
+      avatar: record.avatar,
+      score: best
+    });
+  }
 
   broadcastRoomState(roomCode);
   broadcast(roomCode, "match_ended", {

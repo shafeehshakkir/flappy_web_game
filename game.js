@@ -31,6 +31,8 @@ const topBestScoreEl = document.getElementById("topBestScore");
 const topDifficultyEl = document.getElementById("topDifficulty");
 const topRoomCodeEl = document.getElementById("topRoomCode");
 const leaderboardList = document.getElementById("leaderboardList");
+const globalLeaderboardTabs = document.getElementById("globalLeaderboardTabs");
+const globalLeaderboardList = document.getElementById("globalLeaderboardList");
 const nameInput = document.getElementById("nameInput");
 const saveNameBtn = document.getElementById("saveNameBtn");
 const playerNameEl = document.getElementById("playerName");
@@ -101,6 +103,9 @@ let playerAvatar = getStoredAvatar();
 let bestScore = Number(localStorage.getItem("flappyBestScore") || 0);
 let leaderboard = JSON.parse(localStorage.getItem("flappyLeaderboard") || "[]");
 let selectedDifficulty = normalizeDifficulty(localStorage.getItem("flappyDifficulty"));
+let globalLeaderboardDifficulty = selectedDifficulty;
+let globalLeaderboardLastUpdatedAt = 0;
+let globalLeaderboardPollInterval = null;
 
 let socket = null;
 let connected = false;
@@ -316,6 +321,8 @@ function chooseDifficulty(value) {
   localStorage.setItem("flappyDifficulty", selectedDifficulty);
   applyDifficulty(selectedDifficulty);
   updateDifficultyUI();
+  globalLeaderboardDifficulty = selectedDifficulty;
+  refreshGlobalLeaderboard({ difficulty: selectedDifficulty });
   roomMessage.textContent = `Level set to ${DIFFICULTY_SETTINGS[selectedDifficulty].label}.`;
 }
 
@@ -508,6 +515,73 @@ function renderLeaderboard() {
   });
 }
 
+function updateGlobalLeaderboardTabs() {
+  if (!globalLeaderboardTabs) return;
+
+  globalLeaderboardTabs.querySelectorAll("[data-leaderboard-difficulty]").forEach(button => {
+    const difficulty = normalizeDifficulty(button.dataset.leaderboardDifficulty);
+    const selected = difficulty === globalLeaderboardDifficulty;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.tabIndex = selected ? 0 : -1;
+  });
+}
+
+function renderGlobalLeaderboard(entries) {
+  if (!globalLeaderboardList) return;
+  globalLeaderboardList.innerHTML = "";
+
+  if (!Array.isArray(entries) || entries.length === 0) {
+    const li = document.createElement("li");
+    li.innerHTML = "<span>No global scores yet</span><b>0</b>";
+    globalLeaderboardList.appendChild(li);
+    return;
+  }
+
+  entries.slice(0, 15).forEach((entry, index) => {
+    const rank = Math.max(1, Math.floor(Number(entry && entry.rank) || index + 1));
+    const scoreValue = Math.max(0, Math.floor(Number(entry && entry.score) || 0));
+    const name = String(entry && entry.name ? entry.name : "Guest").trim() || "Guest";
+    const tier = entry && entry.tier && typeof entry.tier === "object" ? entry.tier : { id: "bronze", label: "Bronze" };
+    const tierId = ["bronze", "silver", "gold", "platinum", "diamond"].includes(String(tier.id)) ? String(tier.id) : "bronze";
+    const tierLabel = String(tier.label || tierId);
+
+    const li = document.createElement("li");
+    if (rank <= 3) li.classList.add(`rank-${rank}`);
+    li.innerHTML = `<span class="player-row"><span class="rank-badge">${rank}</span>${renderAvatarHtml(entry.avatar, name)}<span class="global-name">${escapeHtml(name)}</span><span class="tier-badge tier-${tierId}">${escapeHtml(tierLabel)}</span></span><b>${scoreValue}</b>`;
+    globalLeaderboardList.appendChild(li);
+  });
+}
+
+async function refreshGlobalLeaderboard({ difficulty } = {}) {
+  if (!globalLeaderboardList) return;
+
+  const chosen = normalizeDifficulty(difficulty || globalLeaderboardDifficulty);
+  globalLeaderboardDifficulty = chosen;
+  updateGlobalLeaderboardTabs();
+
+  try {
+    const response = await fetch(`/api/leaderboard?difficulty=${encodeURIComponent(chosen)}&limit=15`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Bad response");
+    const data = await response.json();
+    globalLeaderboardLastUpdatedAt = Number(data && data.updatedAt) || globalLeaderboardLastUpdatedAt;
+    renderGlobalLeaderboard(Array.isArray(data && data.entries) ? data.entries : []);
+  } catch {
+    const li = document.createElement("li");
+    li.innerHTML = "<span>Global leaderboard offline</span><b>--</b>";
+    globalLeaderboardList.innerHTML = "";
+    globalLeaderboardList.appendChild(li);
+  }
+}
+
+function startGlobalLeaderboardPoll() {
+  if (globalLeaderboardPollInterval) return;
+  globalLeaderboardPollInterval = setInterval(() => {
+    if (document.hidden) return;
+    refreshGlobalLeaderboard();
+  }, 15000);
+}
+
 function leaderboardKey(name) {
   return String(name || "Guest").trim().toLocaleLowerCase() || "guest";
 }
@@ -649,6 +723,39 @@ function startGame() {
   sendSocket("start_game");
 }
 
+let lastGlobalSubmitKey = null;
+
+function globalDifficulty() {
+  return normalizeDifficulty((activeMatch && activeMatch.difficulty) || selectedDifficulty);
+}
+
+async function submitGlobalScore(final) {
+  const scoreValue = Math.max(0, Math.floor(Number(final) || 0));
+  if (!scoreValue) return;
+
+  const difficulty = globalDifficulty();
+  const submitKey = `${difficulty}:${playerName}:${scoreValue}`;
+  if (lastGlobalSubmitKey === submitKey) return;
+  lastGlobalSubmitKey = submitKey;
+
+  try {
+    await fetch("/api/score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: playerName,
+        avatar: playerAvatar,
+        difficulty,
+        score: scoreValue
+      }),
+      keepalive: true
+    });
+    refreshGlobalLeaderboard({ difficulty });
+  } catch {
+    // ignore
+  }
+}
+
 function recordFinalScore(final) {
   finalScoreEl.textContent = final;
 
@@ -659,6 +766,7 @@ function recordFinalScore(final) {
 
   saveLeaderboardScore(playerName, final);
   updateProfileUI();
+  submitGlobalScore(final);
 }
 
 function resetLocalRun({ notifyRoom = true } = {}) {
@@ -970,6 +1078,11 @@ difficultyMenu.addEventListener("click", event => {
   if (!button) return;
   chooseDifficulty(button.dataset.difficulty);
 });
+globalLeaderboardTabs.addEventListener("click", event => {
+  const button = event.target.closest("[data-leaderboard-difficulty]");
+  if (!button) return;
+  refreshGlobalLeaderboard({ difficulty: button.dataset.leaderboardDifficulty });
+});
 avatarUpload.addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
@@ -1009,5 +1122,7 @@ updateConnectionUI();
 updateTopRoomCode();
 updateDifficultyUI();
 updateTimerUI();
+refreshGlobalLeaderboard({ difficulty: globalLeaderboardDifficulty });
+startGlobalLeaderboardPoll();
 connectSocket();
 draw();

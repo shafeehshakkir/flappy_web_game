@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "updatedAt": 1780071057233,
+  "difficulties": {
+    "easy": {},
+    "medium": {
+      "testuser": {
+        "name": "TestUser",
+        "avatar": {
+          "type": "character",
+          "value": "zayn"
+        },
+        "score": 12,
+        "updatedAt": 1780071056582
+      }
+    },
+    "hard": {}
+  }
+}

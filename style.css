@@ -530,6 +530,53 @@ kbd {
   font-weight: 900;
 }
 
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 0 10px;
+  background: #fff7ed;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 3px 3px 0 var(--orange-soft);
+}
+
+.segmented button {
+  padding: 8px 6px;
+  border: 0;
+  border-right: 2px solid var(--ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+  transform: none;
+  font-size: 12px;
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented button:hover,
+.segmented button:active {
+  background: #fff3db;
+  transform: none;
+  box-shadow: none;
+}
+
+.segmented button.selected {
+  background: var(--orange-dark);
+  color: #ffffff;
+}
+
+.segmented button[data-leaderboard-difficulty="easy"].selected {
+  background: var(--green);
+}
+
+.segmented button[data-leaderboard-difficulty="hard"].selected {
+  background: var(--red);
+}
+
 .friends-list,
 .live-list,
 .leaderboard {
@@ -550,17 +597,92 @@ kbd {
   border-radius: 8px;
 }
 
-.live-list .player-row {
+.player-row {
   display: flex;
   align-items: center;
   min-width: 0;
   gap: 8px;
 }
 
-.live-list .player-row span:last-child {
+.player-row span:last-child {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.global-leaderboard li {
+  gap: 8px;
+}
+
+.global-leaderboard .player-row {
+  flex: 1;
+}
+
+.global-leaderboard .global-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-leaderboard li.rank-1 {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.global-leaderboard li.rank-2 {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.global-leaderboard li.rank-3 {
+  background: #ffedd5;
+  border-color: #fb923c;
+}
+
+.rank-badge {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.global-leaderboard li.rank-1 .rank-badge {
+  background: #facc15;
+}
+
+.global-leaderboard li.rank-2 .rank-badge {
+  background: #cbd5e1;
+}
+
+.global-leaderboard li.rank-3 .rank-badge {
+  background: #fdba74;
+}
+
+.tier-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  background: #ffffff;
+  box-shadow: 2px 2px 0 var(--orange-soft);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.tier-badge.tier-bronze { background: #ffedd5; }
+.tier-badge.tier-silver { background: #e2e8f0; }
+.tier-badge.tier-gold { background: #fef9c3; }
+.tier-badge.tier-platinum { background: #cffafe; }
+.tier-badge.tier-diamond { background: #e0e7ff; }
 
 .live-list b,
 .leaderboard b {
@@ -864,6 +986,10 @@ canvas {
   }
 
   .difficulty-menu {
+    grid-template-columns: 1fr;
+  }
+
+  .segmented {
     grid-template-columns: 1fr;
   }
 
