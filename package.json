@@ -1,0 +1,14 @@
+{
+  "name": "flappy-arena-multiplayer",
+  "version": "1.0.0",
+  "description": "Browser Flappy Bird with room-code multiplayer using WebSockets.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "ws": "^8.16.0"
+  }
+}

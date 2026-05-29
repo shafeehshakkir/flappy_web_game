@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flappy Arena Multiplayer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <h1 class="brand-title">
+          <img src="assets/pixelblah.png" alt="Pixel Blah" class="brand-logo" />
+        </h1>
+        <div class="brand-copy">
+          <p>Veni. Vidi. Vici.</p>
+          <div class="top-meta">
+            <span id="connectionStatus" class="status-pill offline">Offline</span>
+            <span class="player-pill">Player: <b id="playerName">Guest</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="top-stats" aria-label="Live stats">
+        <div class="top-stat">
+          <span>Score</span>
+          <strong id="topCurrentScore">0</strong>
+        </div>
+        <div class="top-stat">
+          <span>Best</span>
+          <strong id="topBestScore">0</strong>
+        </div>
+        <div class="top-stat">
+          <span>Room</span>
+          <strong id="topRoomCode">SOLO</strong>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="copyRoomBtn" class="top-btn" type="button">Copy Code</button>
+        <button id="quickResetBtn" class="top-btn" type="button">Reset Run</button>
+        <button id="fullscreenBtn" class="top-btn icon-btn" type="button" aria-label="Toggle fullscreen" title="Toggle fullscreen">FULL</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar left-panel">
+        <section class="card profile-card">
+          <h2>Profile</h2>
+          <label for="nameInput">Display name</label>
+          <div class="name-row">
+            <input id="nameInput" type="text" placeholder="Enter name" maxlength="18" />
+            <button id="saveNameBtn">Save</button>
+          </div>
+          <div class="avatar-panel">
+            <div id="avatarPreview" class="avatar-preview character-avatar avatar-zayn">ZAYN</div>
+            <div class="avatar-tools">
+              <label for="avatarUpload">Profile image</label>
+              <input id="avatarUpload" class="file-input" type="file" accept="image/png, image/jpeg, image/webp" />
+            </div>
+          </div>
+          <div id="characterMenu" class="character-menu" aria-label="Choose character">
+            <button type="button" data-character="zayn" class="selected">Zayn</button>
+            <button type="button" data-character="reid">Reid</button>
+            <button type="button" data-character="levi">Levi</button>
+            <button type="button" data-character="maya">Maya</button>
+            <button type="button" data-character="nova">Nova</button>
+            <button type="button" data-character="skye">Skye</button>
+          </div>
+          <div class="stats-grid">
+            <div><span>Current</span><strong id="currentScore">0</strong></div>
+            <div><span>Best</span><strong id="bestScore">0</strong></div>
+          </div>
+        </section>
+
+        <section class="card room-card">
+          <h2>Multiplayer Room</h2>
+          <label for="matchDurationInput">Timer seconds</label>
+          <input id="matchDurationInput" type="number" min="15" max="300" step="15" value="60" />
+          <button id="createRoomBtn" class="wide-btn">Create Room</button>
+          <div class="join-row">
+            <input id="roomCodeInput" type="text" placeholder="Room code" maxlength="6" />
+            <button id="joinRoomBtn">Join</button>
+          </div>
+          <button id="leaveRoomBtn" class="wide-btn danger-btn">Leave Room</button>
+          <p id="roomMessage" class="small-message">Create a room and share the code with your friend.</p>
+        </section>
+
+      </aside>
+
+      <section class="game-column">
+        <div class="game-wrapper">
+          <canvas id="gameCanvas" width="360" height="640"></canvas>
+          <div id="startOverlay" class="overlay">
+            <h2>Ready?</h2>
+            <p>Press Space or click to start</p>
+          </div>
+          <div id="gameOverOverlay" class="overlay hidden">
+            <h2>Game Over</h2>
+            <p>Score: <span id="finalScore">0</span></p>
+            <button id="restartBtn">Play Again</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="sidebar right-panel">
+        <section class="card">
+          <h2>Live Match</h2>
+          <div class="room-code">Room: <span id="activeRoomCode">SOLO</span></div>
+          <div class="timer-board">
+            <span id="roomStatus">Solo run</span>
+            <strong id="roomTimer">--:--</strong>
+          </div>
+          <div class="timer-actions">
+            <button id="startGameBtn" type="button">START GAME</button>
+          </div>
+          <ol id="livePlayersList" class="live-list">
+            <li><span id="livePlayerName">Guest</span> <b data-live-player-score>0</b></li>
+          </ol>
+        </section>
+
+        <section class="card">
+          <h2>Local Leaderboard</h2>
+          <ol id="leaderboardList" class="leaderboard"></ol>
+        </section>
+
+        <section class="card info-card">
+          <h2>Help</h2>
+          <details>
+            <summary>Controls</summary>
+            <p><kbd>Space</kbd> or click/tap to flap.</p>
+            <p>Press <kbd>R</kbd> to restart after game over.</p>
+          </details>
+          <details>
+            <summary>How Multiplayer Works</summary>
+            <p class="muted">This version syncs profiles, best session score, match timer, and winner status in a shared room. Each player still runs their own game locally.</p>
+          </details>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <div id="winnerModal" class="winner-modal hidden" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
+    <div class="winner-burst"></div>
+    <div class="winner-card">
+      <p class="winner-kicker">Time!</p>
+      <h2 id="winnerTitle">Winner</h2>
+      <div id="winnerAvatar" class="winner-avatar character-avatar avatar-zayn">ZAYN</div>
+      <h3 id="winnerName">Guest</h3>
+      <p>Score: <strong id="winnerScore">0</strong></p>
+      <button id="winnerCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
