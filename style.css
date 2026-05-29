@@ -665,25 +665,6 @@ kbd {
   background: #fdba74;
 }
 
-.tier-badge {
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 2px solid var(--ink);
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
-  background: #ffffff;
-  box-shadow: 2px 2px 0 var(--orange-soft);
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
-
-.tier-badge.tier-bronze { background: #ffedd5; }
-.tier-badge.tier-silver { background: #e2e8f0; }
-.tier-badge.tier-gold { background: #fef9c3; }
-.tier-badge.tier-platinum { background: #cffafe; }
-.tier-badge.tier-diamond { background: #e0e7ff; }
-
 .live-list b,
 .leaderboard b {
   min-width: 38px;

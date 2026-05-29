@@ -33,6 +33,7 @@ const topRoomCodeEl = document.getElementById("topRoomCode");
 const leaderboardList = document.getElementById("leaderboardList");
 const globalLeaderboardTabs = document.getElementById("globalLeaderboardTabs");
 const globalLeaderboardList = document.getElementById("globalLeaderboardList");
+const globalLeaderboardCard = document.getElementById("globalLeaderboardCard");
 const nameInput = document.getElementById("nameInput");
 const saveNameBtn = document.getElementById("saveNameBtn");
 const playerNameEl = document.getElementById("playerName");
@@ -160,6 +161,7 @@ function connectSocket() {
     activeMatch = null;
     playerId = null;
     updateTopRoomCode();
+    updateGlobalLeaderboardVisibility();
     applyDifficulty(selectedDifficulty);
     updateDifficultyUI();
     updateConnectionUI();
@@ -177,6 +179,7 @@ function connectSocket() {
       roomMessage.textContent = `Joined room ${data.roomCode}. Share this code with friends.`;
       activeRoomCodeEl.textContent = data.roomCode;
       updateTopRoomCode();
+      updateGlobalLeaderboardVisibility();
       shownWinnerKey = null;
       setActiveMatch(data.match);
       sendPlayerStatus();
@@ -186,6 +189,7 @@ function connectSocket() {
       activeRoomCode = data.roomCode;
       activeRoomCodeEl.textContent = data.roomCode;
       updateTopRoomCode();
+      updateGlobalLeaderboardVisibility();
       setActiveMatch(data.match);
       renderLivePlayers(data.players || []);
       if (data.match && data.match.status === "ended") showWinnerPopup(data.match.winner);
@@ -242,6 +246,7 @@ function leaveRoom() {
   activeMatch = null;
   activeRoomCodeEl.textContent = "SOLO";
   updateTopRoomCode();
+  updateGlobalLeaderboardVisibility();
   applyDifficulty(selectedDifficulty);
   updateDifficultyUI();
   renderLivePlayers([]);
@@ -277,6 +282,11 @@ function updateConnectionUI() {
 function updateTopRoomCode() {
   topRoomCodeEl.textContent = activeRoomCode || "SOLO";
   copyRoomBtn.disabled = !activeRoomCode;
+}
+
+function updateGlobalLeaderboardVisibility() {
+  if (!globalLeaderboardCard) return;
+  globalLeaderboardCard.classList.toggle("hidden", Boolean(activeRoomCode));
 }
 
 function normalizeDifficulty(value) {
@@ -542,19 +552,17 @@ function renderGlobalLeaderboard(entries) {
     const rank = Math.max(1, Math.floor(Number(entry && entry.rank) || index + 1));
     const scoreValue = Math.max(0, Math.floor(Number(entry && entry.score) || 0));
     const name = String(entry && entry.name ? entry.name : "Guest").trim() || "Guest";
-    const tier = entry && entry.tier && typeof entry.tier === "object" ? entry.tier : { id: "bronze", label: "Bronze" };
-    const tierId = ["bronze", "silver", "gold", "platinum", "diamond"].includes(String(tier.id)) ? String(tier.id) : "bronze";
-    const tierLabel = String(tier.label || tierId);
 
     const li = document.createElement("li");
     if (rank <= 3) li.classList.add(`rank-${rank}`);
-    li.innerHTML = `<span class="player-row"><span class="rank-badge">${rank}</span>${renderAvatarHtml(entry.avatar, name)}<span class="global-name">${escapeHtml(name)}</span><span class="tier-badge tier-${tierId}">${escapeHtml(tierLabel)}</span></span><b>${scoreValue}</b>`;
+    li.innerHTML = `<span class="player-row"><span class="rank-badge">${rank}</span>${renderAvatarHtml(entry.avatar, name)}<span class="global-name">${escapeHtml(name)}</span></span><b>${scoreValue}</b>`;
     globalLeaderboardList.appendChild(li);
   });
 }
 
 async function refreshGlobalLeaderboard({ difficulty } = {}) {
   if (!globalLeaderboardList) return;
+  if (activeRoomCode) return;
 
   const chosen = normalizeDifficulty(difficulty || globalLeaderboardDifficulty);
   globalLeaderboardDifficulty = chosen;
@@ -1120,6 +1128,7 @@ applyDifficulty(selectedDifficulty);
 updateProfileUI();
 updateConnectionUI();
 updateTopRoomCode();
+updateGlobalLeaderboardVisibility();
 updateDifficultyUI();
 updateTimerUI();
 refreshGlobalLeaderboard({ difficulty: globalLeaderboardDifficulty });
