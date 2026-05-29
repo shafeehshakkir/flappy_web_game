@@ -112,7 +112,7 @@ body::before {
 
 .top-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(88px, 1fr));
+  grid-template-columns: repeat(4, minmax(76px, 1fr));
   gap: 8px;
   min-width: 0;
 }
@@ -454,6 +454,33 @@ button:active {
 .character-menu button.selected {
   color: #ffffff;
   background: var(--orange-dark);
+}
+
+.difficulty-menu {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.difficulty-menu button {
+  padding: 8px 6px;
+  color: var(--ink);
+  background: #fff7ed;
+  box-shadow: 3px 3px 0 var(--ink);
+  font-size: 12px;
+}
+
+.difficulty-menu button.selected {
+  color: #ffffff;
+  background: var(--orange-dark);
+}
+
+.difficulty-menu button[data-difficulty="easy"].selected {
+  background: var(--green);
+}
+
+.difficulty-menu button[data-difficulty="hard"].selected {
+  background: var(--red);
 }
 
 .character-avatar {
@@ -834,6 +861,10 @@ canvas {
 
   .character-menu {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .difficulty-menu {
+    grid-template-columns: 1fr;
   }
 
   .brand-logo {

@@ -28,6 +28,7 @@ const currentScoreEl = document.getElementById("currentScore");
 const bestScoreEl = document.getElementById("bestScore");
 const topCurrentScoreEl = document.getElementById("topCurrentScore");
 const topBestScoreEl = document.getElementById("topBestScore");
+const topDifficultyEl = document.getElementById("topDifficulty");
 const topRoomCodeEl = document.getElementById("topRoomCode");
 const leaderboardList = document.getElementById("leaderboardList");
 const nameInput = document.getElementById("nameInput");
@@ -43,6 +44,7 @@ const roomMessage = document.getElementById("roomMessage");
 const activeRoomCodeEl = document.getElementById("activeRoomCode");
 const livePlayersList = document.getElementById("livePlayersList");
 const matchDurationInput = document.getElementById("matchDurationInput");
+const difficultyMenu = document.getElementById("difficultyMenu");
 const avatarUpload = document.getElementById("avatarUpload");
 const avatarPreview = document.getElementById("avatarPreview");
 const characterMenu = document.getElementById("characterMenu");
@@ -67,10 +69,38 @@ const CHARACTER_LABELS = {
   skye: "SKYE"
 };
 
+const DIFFICULTY_SETTINGS = {
+  easy: {
+    label: "Easy",
+    pipeSpeed: -3.2,
+    openingSpace: Math.round(boardHeight / 3),
+    gravity: 0.82,
+    flapStrength: -8.3,
+    pipeIntervalMs: 1750
+  },
+  medium: {
+    label: "Medium",
+    pipeSpeed: -4,
+    openingSpace: Math.round(boardHeight / 4),
+    gravity: 1,
+    flapStrength: -9,
+    pipeIntervalMs: 1500
+  },
+  hard: {
+    label: "Hard",
+    pipeSpeed: -5.1,
+    openingSpace: 132,
+    gravity: 1.08,
+    flapStrength: -9.6,
+    pipeIntervalMs: 1225
+  }
+};
+
 let playerName = localStorage.getItem("flappyPlayerName") || "Guest";
 let playerAvatar = getStoredAvatar();
 let bestScore = Number(localStorage.getItem("flappyBestScore") || 0);
 let leaderboard = JSON.parse(localStorage.getItem("flappyLeaderboard") || "[]");
+let selectedDifficulty = normalizeDifficulty(localStorage.getItem("flappyDifficulty"));
 
 let socket = null;
 let connected = false;
@@ -97,6 +127,8 @@ const pipeConfig = {
 let pipes = [];
 let velocityY = 0;
 let gravity = 1;
+let flapStrength = -9;
+let pipeIntervalMs = 1500;
 let score = 0;
 let gameOver = false;
 let started = false;
@@ -120,8 +152,11 @@ function connectSocket() {
   socket.addEventListener("close", () => {
     connected = false;
     activeRoomCode = null;
+    activeMatch = null;
     playerId = null;
     updateTopRoomCode();
+    applyDifficulty(selectedDifficulty);
+    updateDifficultyUI();
     updateConnectionUI();
     renderLivePlayers([]);
     roomMessage.textContent = "Server disconnected. Refresh after starting the server.";
@@ -179,7 +214,8 @@ function createRoom() {
     name: playerName,
     avatar: playerAvatar,
     settings: {
-      durationSeconds: Number(matchDurationInput.value) || 60
+      durationSeconds: Number(matchDurationInput.value) || 60,
+      difficulty: selectedDifficulty
     }
   });
 }
@@ -201,6 +237,8 @@ function leaveRoom() {
   activeMatch = null;
   activeRoomCodeEl.textContent = "SOLO";
   updateTopRoomCode();
+  applyDifficulty(selectedDifficulty);
+  updateDifficultyUI();
   renderLivePlayers([]);
   updateTimerUI();
   roomMessage.textContent = "Left room. You are playing solo.";
@@ -234,6 +272,51 @@ function updateConnectionUI() {
 function updateTopRoomCode() {
   topRoomCodeEl.textContent = activeRoomCode || "SOLO";
   copyRoomBtn.disabled = !activeRoomCode;
+}
+
+function normalizeDifficulty(value) {
+  const difficulty = String(value || "medium").toLowerCase();
+  return DIFFICULTY_SETTINGS[difficulty] ? difficulty : "medium";
+}
+
+function applyDifficulty(value) {
+  const difficulty = normalizeDifficulty(value);
+  const settings = DIFFICULTY_SETTINGS[difficulty];
+
+  pipeConfig.velocityX = settings.pipeSpeed;
+  pipeConfig.openingSpace = settings.openingSpace;
+  gravity = settings.gravity;
+  flapStrength = settings.flapStrength;
+  pipeIntervalMs = settings.pipeIntervalMs;
+  topDifficultyEl.textContent = settings.label;
+}
+
+function canChangeDifficulty() {
+  return !activeRoomCode || !activeMatch || activeMatch.status === "ended";
+}
+
+function updateDifficultyUI() {
+  const activeDifficulty = normalizeDifficulty((activeMatch && activeMatch.difficulty) || selectedDifficulty);
+  const locked = !canChangeDifficulty();
+
+  difficultyMenu.querySelectorAll("[data-difficulty]").forEach(button => {
+    button.classList.toggle("selected", button.dataset.difficulty === activeDifficulty);
+    button.disabled = locked;
+  });
+  topDifficultyEl.textContent = DIFFICULTY_SETTINGS[activeDifficulty].label;
+}
+
+function chooseDifficulty(value) {
+  if (!canChangeDifficulty()) {
+    roomMessage.textContent = "Level is locked for this room. Create a new room to change it.";
+    return;
+  }
+
+  selectedDifficulty = normalizeDifficulty(value);
+  localStorage.setItem("flappyDifficulty", selectedDifficulty);
+  applyDifficulty(selectedDifficulty);
+  updateDifficultyUI();
+  roomMessage.textContent = `Level set to ${DIFFICULTY_SETTINGS[selectedDifficulty].label}.`;
 }
 
 async function copyRoomCode() {
@@ -474,8 +557,16 @@ function setActiveMatch(match) {
   if (activeMatch && Number.isFinite(activeMatch.durationSeconds)) {
     matchDurationInput.value = activeMatch.durationSeconds;
   }
+  if (activeMatch && activeMatch.difficulty) {
+    selectedDifficulty = normalizeDifficulty(activeMatch.difficulty);
+    localStorage.setItem("flappyDifficulty", selectedDifficulty);
+    applyDifficulty(selectedDifficulty);
+  } else {
+    applyDifficulty(selectedDifficulty);
+  }
   startRoomClock();
   updateTimerUI();
+  updateDifficultyUI();
 }
 
 function startRoomClock() {
@@ -733,7 +824,7 @@ function move(timestamp) {
   bird.y += velocityY;
   bird.y = Math.max(bird.y, 0);
 
-  if (!lastPipeTime || timestamp - lastPipeTime > 1500) {
+  if (!lastPipeTime || timestamp - lastPipeTime > pipeIntervalMs) {
     placePipes();
     lastPipeTime = timestamp;
   }
@@ -805,7 +896,7 @@ function flap() {
     sendPlayerStatus();
     animationId = requestAnimationFrame(loop);
   }
-  if (!gameOver) velocityY = -9;
+  if (!gameOver) velocityY = flapStrength;
 }
 
 function endGame() {
@@ -874,6 +965,11 @@ characterMenu.addEventListener("click", event => {
   saveAvatar({ type: "character", value: button.dataset.character });
   avatarUpload.value = "";
 });
+difficultyMenu.addEventListener("click", event => {
+  const button = event.target.closest("[data-difficulty]");
+  if (!button) return;
+  chooseDifficulty(button.dataset.difficulty);
+});
 avatarUpload.addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
@@ -907,9 +1003,11 @@ winnerModal.addEventListener("click", event => {
 
 leaderboard = normalizeLeaderboard(leaderboard);
 localStorage.setItem("flappyLeaderboard", JSON.stringify(leaderboard));
+applyDifficulty(selectedDifficulty);
 updateProfileUI();
 updateConnectionUI();
 updateTopRoomCode();
+updateDifficultyUI();
 updateTimerUI();
 connectSocket();
 draw();

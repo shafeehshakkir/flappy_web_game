@@ -54,7 +54,7 @@ HOST=0.0.0.0 PORT=3000 npm start
 
 Rooms and scores are kept in server memory for the current session. Empty rooms stay joinable for 15 minutes, then they are cleaned up.
 
-Room creators can set a match timer from 15 to 300 seconds. The timer waits until someone presses **START GAME**, then runs without pause or stop controls. When the timer ends, the server picks the highest best score in the room as the winner and broadcasts their name, score, and profile avatar.
+Room creators can set a match timer from 15 to 300 seconds and choose Easy, Medium, or Hard. The timer waits until someone presses **START GAME**, then runs without pause or stop controls. When the timer ends, the server picks the highest best score in the room as the winner and broadcasts their name, score, and profile avatar.
 
 ## How to test multiplayer on one laptop
 
@@ -72,6 +72,7 @@ This version syncs:
 - room code
 - player names
 - profile image or chosen character
+- room difficulty level
 - current score and best score for each name in the room session
 - timed match status and winner
 - alive/game-over status

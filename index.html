@@ -31,6 +31,10 @@
           <strong id="topBestScore">0</strong>
         </div>
         <div class="top-stat">
+          <span>Level</span>
+          <strong id="topDifficulty">Medium</strong>
+        </div>
+        <div class="top-stat">
           <span>Room</span>
           <strong id="topRoomCode">SOLO</strong>
         </div>
@@ -74,6 +78,12 @@
 
         <section class="card room-card">
           <h2>Multiplayer Room</h2>
+          <label>Level</label>
+          <div id="difficultyMenu" class="difficulty-menu" aria-label="Choose level">
+            <button type="button" data-difficulty="easy">Easy</button>
+            <button type="button" data-difficulty="medium" class="selected">Medium</button>
+            <button type="button" data-difficulty="hard">Hard</button>
+          </div>
           <label for="matchDurationInput">Timer seconds</label>
           <input id="matchDurationInput" type="number" min="15" max="300" step="15" value="60" />
           <button id="createRoomBtn" class="wide-btn">Create Room</button>

@@ -11,6 +11,7 @@ const DEFAULT_MATCH_SECONDS = 60;
 const MIN_MATCH_SECONDS = 15;
 const MAX_MATCH_SECONDS = 300;
 const MAX_AVATAR_DATA_URL_LENGTH = 120000;
+const DIFFICULTY_LEVELS = new Set(["easy", "medium", "hard"]);
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -40,6 +41,11 @@ function normalizeDurationSeconds(value) {
   return Math.max(MIN_MATCH_SECONDS, Math.min(MAX_MATCH_SECONDS, Math.round(seconds)));
 }
 
+function normalizeDifficulty(value) {
+  const difficulty = String(value || "medium").toLowerCase();
+  return DIFFICULTY_LEVELS.has(difficulty) ? difficulty : "medium";
+}
+
 function safeAvatar(avatar) {
   if (!avatar || typeof avatar !== "object") return { type: "character", value: "zayn" };
 
@@ -60,6 +66,7 @@ function safeAvatar(avatar) {
 
 function createRoom(roomCode, settings = {}) {
   const durationSeconds = normalizeDurationSeconds(settings.durationSeconds);
+  const difficulty = normalizeDifficulty(settings.difficulty);
   const remainingMs = durationSeconds * 1000;
 
   rooms.set(roomCode, {
@@ -69,6 +76,7 @@ function createRoom(roomCode, settings = {}) {
     cleanupTimer: null,
     matchTimer: null,
     durationSeconds,
+    difficulty,
     remainingMs,
     endsAt: null,
     endedAt: null,
@@ -203,6 +211,7 @@ function getMatchSnapshot(room) {
 
   return {
     durationSeconds: room.durationSeconds,
+    difficulty: room.difficulty,
     endsAt: room.endsAt,
     remainingMs,
     endedAt: room.endedAt,
